@@ -41,7 +41,8 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
                              supervisedHeadFinderConllPath: String = "") {
 
   lazy val treebank = treebankType.toLowerCase() match {
-    case "penn" => Treebank.fromPennTreebankDir(path)
+    case "penn" => Treebank.fromPennTreebankDir(path, posSplits = false)
+    case "penn_pos" => Treebank.fromPennTreebankDir(path, posSplits = true)
     case "chinese" => Treebank.fromChineseTreebankDir(path)
     case "negra" => Treebank.fromGermanTreebank(path)
     case "simple" => new SimpleTreebank(new File(path, "train.txt"), new File(path, "dev.txt"), new File(path, "test.txt"))

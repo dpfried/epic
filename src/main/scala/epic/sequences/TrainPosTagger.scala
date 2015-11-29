@@ -12,14 +12,14 @@ import epic.trees.{AnnotatedLabel, ProcessedTreebank}
  * @author dlwh
  */
 object TrainPosTagger extends LazyLogging {
-  case class Params(opt: OptParams, treebank: ProcessedTreebank, modelOut: File = new File("pos-model.ser.gz"))
+  case class Params(opt: OptParams, treebank: ProcessedTreebank, testOnDev: Boolean = true, modelOut: File = new File("pos-model.ser.gz"))
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
     logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     import params._
     val train = treebank.trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)).map(_.asTaggedSequence)
-    val test = treebank.devTrees.map(_.mapLabels(_.baseAnnotatedLabel)).map(_.asTaggedSequence)
+    val test = (if (testOnDev) treebank.devTrees else treebank.testTrees).map(_.mapLabels(_.baseAnnotatedLabel)).map(_.asTaggedSequence)
 
     val crf = CRF.buildSimple(train, AnnotatedLabel("TOP"), opt = opt)
     breeze.util.writeObject(modelOut, crf)

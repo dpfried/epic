@@ -110,14 +110,23 @@ object Treebank {
   * Reads a treebank from the "mrg/wsj" section
   * of the parsed Treebank.
   */
-  def fromPennTreebankDir(dir: File):Treebank[String] = new Treebank[String] {
+  def fromPennTreebankDir(dir: File, posSplits: Boolean = false):Treebank[String] = new Treebank[String] {
     if(!dir.exists) throw new FileNotFoundException(dir.toString)
     def sections = dir.listFiles.filter(_.isDirectory).map(_.getName)
-    val train = Portion("train", IndexedSeq.range(2,10).map("0" + _) ++ IndexedSeq.range(10,22).map(""+_))
+    val train = if (posSplits)
+      Portion("train", IndexedSeq.range(0,10).map("0" + _) ++ IndexedSeq.range(10,19).map(""+_))
+    else
+      Portion("train", IndexedSeq.range(2,10).map("0" + _) ++ IndexedSeq.range(10,22).map(""+_))
 
-    val test = Portion("test",IndexedSeq("23"))
+    val test = if (posSplits)
+      Portion("test", IndexedSeq.range(22,25).map(""+_))
+    else
+      Portion("test",IndexedSeq("23"))
 
-    val dev = Portion("dev",IndexedSeq("22"))
+    val dev = if (posSplits)
+      Portion("dev", IndexedSeq.range(19,22).map(""+_))
+    else
+      Portion("dev",IndexedSeq("22"))
 
     def treesFromSection(sec: String) = {
       for(file <- new File(dir,sec).listFiles.iterator;
