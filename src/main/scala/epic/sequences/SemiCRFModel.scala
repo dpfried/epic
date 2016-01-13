@@ -108,6 +108,11 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
       constraintsFactory.constraints(sentence)))
   }
 
+  def lossAugmentedViterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L,W], gold: Segmentation[L, W]): (Segmentation[L, W], Double) = {
+    SemiCRF.lossAugmentedViterbi(anchoring * new Anchoring(featurizer.anchor(sentence),
+      constraintsFactory.constraints(sentence)), Some(gold))
+  }
+
   type Marginal = SemiCRF.Marginal[L, W]
   type Scorer = SemiCRF.Anchoring[L, W]
 

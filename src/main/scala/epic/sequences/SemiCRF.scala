@@ -41,7 +41,12 @@ trait SemiCRF[L, W] extends Serializable {
   }
 
   def bestSequence(w: IndexedSeq[W], id: String = ""): Segmentation[L, W] = {
-    SemiCRF.posteriorDecode(marginal(w), id)
+    // SemiCRF.posteriorDecode(marginal(w), id)
+    SemiCRF.viterbi(scorer(w), id)
+  }
+
+  def lossAugmentedBestSequence(gold: Segmentation[L,W]): (Segmentation[L, W], Double) = {
+    SemiCRF.lossAugmentedViterbi(scorer(gold.words), Some(gold))
   }
 
 }
@@ -551,8 +556,22 @@ object SemiCRF {
     def featuresForTransition(prev: Int, cur: Int, begin: Int, end: Int):FeatureVector
   }
 
-
   def viterbi[L, W](anchoring: Anchoring[L ,W], id: String=""):Segmentation[L, W] = {
+    lossAugmentedViterbi(anchoring, None, id)._1
+  }
+
+  def lossAugmentedViterbi[L, W](anchoring: Anchoring[L ,W], gold: Option[Segmentation[L,W]], id: String=""):(Segmentation[L, W], Double) = {
+
+    def toLabelArray(segmentation: Segmentation[L,_]) = {
+      val labels = Array.fill[Option[L]](anchoring.length)(None)
+      for ((l, span) <- segmentation.segments) {
+        (span.begin until span.end).foreach(i => labels(i) = Some(l))
+      }
+      labels.map(anchoring.labelIndex)
+    }
+
+    val goldLabels: Option[Array[Int]] = gold.map(toLabelArray)
+
     val length = anchoring.length
     val numLabels = anchoring.labelIndex.size
     // total weight (logSum) for ending in pos with label l.
@@ -574,7 +593,8 @@ object SemiCRF {
             while (prevLabel < numLabels) {
               val prevScore = forwardScores(begin)(prevLabel)
               if (prevScore != Double.NegativeInfinity) {
-                val score = anchoring.scoreTransition(prevLabel, label, begin, end) + prevScore
+                val marginalLoss = goldLabels.map(labelArray => (begin until end).map(i => if (labelArray(i) == label) 0 else 1).sum).getOrElse(0)
+                val score = anchoring.scoreTransition(prevLabel, label, begin, end) + prevScore + marginalLoss
                 if (score > forwardScores(end)(label)) {
                   forwardScores(end)(label) = score
                   forwardLabelPointers(end)(label) = prevLabel
@@ -605,11 +625,15 @@ object SemiCRF {
     }
     rec(length, (0 until numLabels).maxBy(forwardScores(length)(_)))
 
-    Segmentation(segments.reverse, anchoring.words, id)
+    val segmentation = Segmentation(segments.reverse, anchoring.words, id)
+
+    val loss = goldLabels.map(labels => (labels, toLabelArray(segmentation)).zipped.map((g, p) => if (g == p) 0 else 1).sum).getOrElse(0)
+
+    (segmentation, loss)
   }
 
 
-  def posteriorDecode[L, W](m: Marginal[L, W], id: String = "") = {
+  def posteriorDecode[L, W](m: Marginal[L, W], id: String = ""): Segmentation[L, W] = {
     val length = m.length
     val numLabels = m.anchoring.labelIndex.size
     val forwardScores = Array.fill(length+1, numLabels)(0.0)
